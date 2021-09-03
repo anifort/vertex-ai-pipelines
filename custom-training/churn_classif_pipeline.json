@@ -1,0 +1,271 @@
+{
+  "pipelineSpec": {
+    "components": {
+      "comp-custompythonpackagetrainingjob-run": {
+        "executorLabel": "exec-custompythonpackagetrainingjob-run",
+        "inputDefinitions": {
+          "artifacts": {
+            "dataset": {
+              "artifactType": {
+                "schemaTitle": "system.Dataset"
+              }
+            }
+          },
+          "parameters": {
+            "project": {
+              "type": "STRING"
+            }
+          }
+        },
+        "outputDefinitions": {
+          "artifacts": {
+            "model": {
+              "artifactType": {
+                "schemaTitle": "system.Model"
+              }
+            }
+          }
+        }
+      },
+      "comp-model-deploy": {
+        "executorLabel": "exec-model-deploy",
+        "inputDefinitions": {
+          "artifacts": {
+            "model": {
+              "artifactType": {
+                "schemaTitle": "system.Model"
+              }
+            }
+          },
+          "parameters": {
+            "project": {
+              "type": "STRING"
+            }
+          }
+        },
+        "outputDefinitions": {
+          "artifacts": {
+            "endpoint": {
+              "artifactType": {
+                "schemaTitle": "system.Artifact"
+              }
+            }
+          }
+        }
+      },
+      "comp-tabulardataset-create": {
+        "executorLabel": "exec-tabulardataset-create",
+        "inputDefinitions": {
+          "parameters": {
+            "project": {
+              "type": "STRING"
+            }
+          }
+        },
+        "outputDefinitions": {
+          "artifacts": {
+            "dataset": {
+              "artifactType": {
+                "schemaTitle": "system.Dataset"
+              }
+            }
+          }
+        }
+      }
+    },
+    "deploymentSpec": {
+      "executors": {
+        "exec-custompythonpackagetrainingjob-run": {
+          "container": {
+            "args": [
+              "--init.display_name",
+              "train_churn_prediction_v3",
+              "--init.python_package_gcs_uri",
+              "gs://feature-store-mars21/churn-model-dist/churn-0.1.tar.gz",
+              "--init.python_module_name",
+              "trainer.task",
+              "--init.model_description",
+              "Churn prediction model",
+              "--init.container_uri",
+              "eu.gcr.io/cloud-aiplatform/training/scikit-learn-cpu.0-23:latest",
+              "--init.model_serving_container_image_uri",
+              "eu.gcr.io/cloud-aiplatform/prediction/sklearn-cpu.0-23:latest",
+              "--init.staging_bucket",
+              "gs://feature-store-mars21/pl-root/telco-churn-custom/staging",
+              "--method.model_display_name",
+              "myChurnModelv3",
+              "--method.base_output_dir",
+              "gs://feature-store-mars21/pl-root/telco-churn-custom/assets-v3",
+              "--method.machine_type",
+              "n1-standard-4",
+              "--method.training_fraction_split",
+              "0.8",
+              "--method.validation_fraction_split",
+              "0.1",
+              "--method.test_fraction_split",
+              "0.1",
+              "--executor_input",
+              "{{$}}",
+              "--resource_name_output_artifact_uri",
+              "{{$.outputs.artifacts['model'].uri}}",
+              "--init.project",
+              "{{$.inputs.parameters['project']}}",
+              "--method.dataset",
+              "{{$.inputs.artifacts['dataset'].uri}}"
+            ],
+            "command": [
+              "python3",
+              "-m",
+              "google_cloud_pipeline_components.aiplatform.remote_runner",
+              "--cls_name",
+              "CustomPythonPackageTrainingJob",
+              "--method_name",
+              "run"
+            ],
+            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.1.4"
+          }
+        },
+        "exec-model-deploy": {
+          "container": {
+            "args": [
+              "--method.machine_type",
+              "n1-standard-4",
+              "--executor_input",
+              "{{$}}",
+              "--resource_name_output_artifact_uri",
+              "{{$.outputs.artifacts['endpoint'].uri}}",
+              "--init.model_name",
+              "{{$.inputs.artifacts['model'].uri}}",
+              "--init.project",
+              "{{$.inputs.parameters['project']}}"
+            ],
+            "command": [
+              "python3",
+              "-m",
+              "google_cloud_pipeline_components.aiplatform.remote_runner",
+              "--cls_name",
+              "Model",
+              "--method_name",
+              "deploy"
+            ],
+            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.1.4"
+          }
+        },
+        "exec-tabulardataset-create": {
+          "container": {
+            "args": [
+              "--method.display_name",
+              "churn-pred",
+              "--method.gcs_source",
+              "gs://feature-store-mars21/data/telco/Telco-Customer-Churn.csv",
+              "--executor_input",
+              "{{$}}",
+              "--resource_name_output_artifact_uri",
+              "{{$.outputs.artifacts['dataset'].uri}}",
+              "--method.project",
+              "{{$.inputs.parameters['project']}}"
+            ],
+            "command": [
+              "python3",
+              "-m",
+              "google_cloud_pipeline_components.aiplatform.remote_runner",
+              "--cls_name",
+              "TabularDataset",
+              "--method_name",
+              "create"
+            ],
+            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.1.4"
+          }
+        }
+      }
+    },
+    "pipelineInfo": {
+      "name": "custom-training-v3"
+    },
+    "root": {
+      "dag": {
+        "tasks": {
+          "custompythonpackagetrainingjob-run": {
+            "componentRef": {
+              "name": "comp-custompythonpackagetrainingjob-run"
+            },
+            "dependentTasks": [
+              "tabulardataset-create"
+            ],
+            "inputs": {
+              "artifacts": {
+                "dataset": {
+                  "taskOutputArtifact": {
+                    "outputArtifactKey": "dataset",
+                    "producerTask": "tabulardataset-create"
+                  }
+                }
+              },
+              "parameters": {
+                "project": {
+                  "componentInputParameter": "project_id"
+                }
+              }
+            },
+            "taskInfo": {
+              "name": "custompythonpackagetrainingjob-run"
+            }
+          },
+          "model-deploy": {
+            "componentRef": {
+              "name": "comp-model-deploy"
+            },
+            "dependentTasks": [
+              "custompythonpackagetrainingjob-run"
+            ],
+            "inputs": {
+              "artifacts": {
+                "model": {
+                  "taskOutputArtifact": {
+                    "outputArtifactKey": "model",
+                    "producerTask": "custompythonpackagetrainingjob-run"
+                  }
+                }
+              },
+              "parameters": {
+                "project": {
+                  "componentInputParameter": "project_id"
+                }
+              }
+            },
+            "taskInfo": {
+              "name": "model-deploy"
+            }
+          },
+          "tabulardataset-create": {
+            "componentRef": {
+              "name": "comp-tabulardataset-create"
+            },
+            "inputs": {
+              "parameters": {
+                "project": {
+                  "componentInputParameter": "project_id"
+                }
+              }
+            },
+            "taskInfo": {
+              "name": "tabulardataset-create"
+            }
+          }
+        }
+      },
+      "inputDefinitions": {
+        "parameters": {
+          "project_id": {
+            "type": "STRING"
+          }
+        }
+      }
+    },
+    "schemaVersion": "2.0.0",
+    "sdkVersion": "kfp-1.6.2"
+  },
+  "runtimeConfig": {
+    "gcsOutputDirectory": "gs://feature-store-mars21/pl-root/telco-churn-custom"
+  }
+}
