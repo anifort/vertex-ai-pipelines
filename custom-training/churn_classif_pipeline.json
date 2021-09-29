@@ -7,7 +7,8 @@
           "artifacts": {
             "dataset": {
               "artifactType": {
-                "schemaTitle": "system.Dataset"
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
               }
             }
           },
@@ -21,7 +22,8 @@
           "artifacts": {
             "model": {
               "artifactType": {
-                "schemaTitle": "system.Model"
+                "schemaTitle": "system.Model",
+                "schemaVersion": "0.0.1"
               }
             }
           }
@@ -33,11 +35,18 @@
           "artifacts": {
             "model": {
               "artifactType": {
-                "schemaTitle": "system.Model"
+                "schemaTitle": "system.Model",
+                "schemaVersion": "0.0.1"
               }
             }
           },
           "parameters": {
+            "location": {
+              "type": "STRING"
+            },
+            "machine_type": {
+              "type": "STRING"
+            },
             "project": {
               "type": "STRING"
             }
@@ -47,7 +56,8 @@
           "artifacts": {
             "endpoint": {
               "artifactType": {
-                "schemaTitle": "system.Artifact"
+                "schemaTitle": "system.Artifact",
+                "schemaVersion": "0.0.1"
               }
             }
           }
@@ -66,7 +76,8 @@
           "artifacts": {
             "dataset": {
               "artifactType": {
-                "schemaTitle": "system.Dataset"
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
               }
             }
           }
@@ -79,7 +90,7 @@
           "container": {
             "args": [
               "--init.display_name",
-              "train_churn_prediction_v3",
+              "train_churn_prediction_v1",
               "--init.python_package_gcs_uri",
               "gs://feature-store-mars21/churn-model-dist/churn-0.1.tar.gz",
               "--init.python_module_name",
@@ -91,11 +102,11 @@
               "--init.model_serving_container_image_uri",
               "eu.gcr.io/cloud-aiplatform/prediction/sklearn-cpu.0-23:latest",
               "--init.staging_bucket",
-              "gs://feature-store-mars21/pl-root/telco-churn-custom/staging",
+              "gs://feature-store-mars21/churn-custom/staging",
               "--method.model_display_name",
-              "myChurnModelv3",
+              "myChurnModelv1",
               "--method.base_output_dir",
-              "gs://feature-store-mars21/pl-root/telco-churn-custom/assets-v3",
+              "gs://feature-store-mars21/churn-custom/assets-v1",
               "--method.machine_type",
               "n1-standard-4",
               "--method.training_fraction_split",
@@ -116,39 +127,41 @@
             "command": [
               "python3",
               "-m",
-              "google_cloud_pipeline_components.aiplatform.remote_runner",
+              "google_cloud_pipeline_components.remote.aiplatform.remote_runner",
               "--cls_name",
               "CustomPythonPackageTrainingJob",
               "--method_name",
               "run"
             ],
-            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.1.4"
+            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.1.7"
           }
         },
         "exec-model-deploy": {
           "container": {
             "args": [
+              "--init.project",
+              "{{$.inputs.parameters['project']}}",
+              "--init.location",
+              "{{$.inputs.parameters['location']}}",
+              "--init.model_name",
+              "{{$.inputs.artifacts['model'].uri}}",
               "--method.machine_type",
-              "n1-standard-4",
+              "{{$.inputs.parameters['machine_type']}}",
               "--executor_input",
               "{{$}}",
               "--resource_name_output_artifact_uri",
-              "{{$.outputs.artifacts['endpoint'].uri}}",
-              "--init.model_name",
-              "{{$.inputs.artifacts['model'].uri}}",
-              "--init.project",
-              "{{$.inputs.parameters['project']}}"
+              "{{$.outputs.artifacts['endpoint'].uri}}"
             ],
             "command": [
               "python3",
               "-m",
-              "google_cloud_pipeline_components.aiplatform.remote_runner",
+              "google_cloud_pipeline_components.remote.aiplatform.remote_runner",
               "--cls_name",
               "Model",
               "--method_name",
               "deploy"
             ],
-            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.1.4"
+            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:latest"
           }
         },
         "exec-tabulardataset-create": {
@@ -168,24 +181,27 @@
             "command": [
               "python3",
               "-m",
-              "google_cloud_pipeline_components.aiplatform.remote_runner",
+              "google_cloud_pipeline_components.remote.aiplatform.remote_runner",
               "--cls_name",
               "TabularDataset",
               "--method_name",
               "create"
             ],
-            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.1.4"
+            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.1.7"
           }
         }
       }
     },
     "pipelineInfo": {
-      "name": "custom-training-v3"
+      "name": "telco-churn-job-v1"
     },
     "root": {
       "dag": {
         "tasks": {
           "custompythonpackagetrainingjob-run": {
+            "cachingOptions": {
+              "enableCache": true
+            },
             "componentRef": {
               "name": "comp-custompythonpackagetrainingjob-run"
             },
@@ -212,6 +228,9 @@
             }
           },
           "model-deploy": {
+            "cachingOptions": {
+              "enableCache": true
+            },
             "componentRef": {
               "name": "comp-model-deploy"
             },
@@ -228,6 +247,20 @@
                 }
               },
               "parameters": {
+                "location": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "us-central1"
+                    }
+                  }
+                },
+                "machine_type": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "n1-standard-4"
+                    }
+                  }
+                },
                 "project": {
                   "componentInputParameter": "project_id"
                 }
@@ -238,6 +271,9 @@
             }
           },
           "tabulardataset-create": {
+            "cachingOptions": {
+              "enableCache": true
+            },
             "componentRef": {
               "name": "comp-tabulardataset-create"
             },
@@ -263,9 +299,9 @@
       }
     },
     "schemaVersion": "2.0.0",
-    "sdkVersion": "kfp-1.6.2"
+    "sdkVersion": "kfp-1.8.1"
   },
   "runtimeConfig": {
-    "gcsOutputDirectory": "gs://feature-store-mars21/pl-root/telco-churn-custom"
+    "gcsOutputDirectory": "gs://feature-store-mars21/churn-custom/pl-root"
   }
 }

@@ -7,7 +7,8 @@
           "artifacts": {
             "dataset": {
               "artifactType": {
-                "schemaTitle": "system.Dataset"
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
               }
             }
           },
@@ -21,7 +22,8 @@
           "artifacts": {
             "model": {
               "artifactType": {
-                "schemaTitle": "system.Model"
+                "schemaTitle": "system.Model",
+                "schemaVersion": "0.0.1"
               }
             }
           }
@@ -33,11 +35,18 @@
           "artifacts": {
             "model": {
               "artifactType": {
-                "schemaTitle": "system.Model"
+                "schemaTitle": "system.Model",
+                "schemaVersion": "0.0.1"
               }
             }
           },
           "parameters": {
+            "location": {
+              "type": "STRING"
+            },
+            "machine_type": {
+              "type": "STRING"
+            },
             "project": {
               "type": "STRING"
             }
@@ -47,7 +56,8 @@
           "artifacts": {
             "endpoint": {
               "artifactType": {
-                "schemaTitle": "system.Artifact"
+                "schemaTitle": "system.Artifact",
+                "schemaVersion": "0.0.1"
               }
             }
           }
@@ -66,7 +76,8 @@
           "artifacts": {
             "dataset": {
               "artifactType": {
-                "schemaTitle": "system.Dataset"
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
               }
             }
           }
@@ -100,39 +111,41 @@
             "command": [
               "python3",
               "-m",
-              "google_cloud_pipeline_components.aiplatform.remote_runner",
+              "google_cloud_pipeline_components.remote.aiplatform.remote_runner",
               "--cls_name",
               "AutoMLTabularTrainingJob",
               "--method_name",
               "run"
             ],
-            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.1.1"
+            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.1.7"
           }
         },
         "exec-model-deploy": {
           "container": {
             "args": [
+              "--init.project",
+              "{{$.inputs.parameters['project']}}",
+              "--init.location",
+              "{{$.inputs.parameters['location']}}",
+              "--init.model_name",
+              "{{$.inputs.artifacts['model'].uri}}",
               "--method.machine_type",
-              "n1-standard-8",
+              "{{$.inputs.parameters['machine_type']}}",
               "--executor_input",
               "{{$}}",
               "--resource_name_output_artifact_uri",
-              "{{$.outputs.artifacts['endpoint'].uri}}",
-              "--init.model_name",
-              "{{$.inputs.artifacts['model'].uri}}",
-              "--init.project",
-              "{{$.inputs.parameters['project']}}"
+              "{{$.outputs.artifacts['endpoint'].uri}}"
             ],
             "command": [
               "python3",
               "-m",
-              "google_cloud_pipeline_components.aiplatform.remote_runner",
+              "google_cloud_pipeline_components.remote.aiplatform.remote_runner",
               "--cls_name",
               "Model",
               "--method_name",
               "deploy"
             ],
-            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.1.1"
+            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:latest"
           }
         },
         "exec-tabulardataset-create": {
@@ -152,13 +165,13 @@
             "command": [
               "python3",
               "-m",
-              "google_cloud_pipeline_components.aiplatform.remote_runner",
+              "google_cloud_pipeline_components.remote.aiplatform.remote_runner",
               "--cls_name",
               "TabularDataset",
               "--method_name",
               "create"
             ],
-            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.1.1"
+            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.1.7"
           }
         }
       }
@@ -170,6 +183,9 @@
       "dag": {
         "tasks": {
           "automltabulartrainingjob-run": {
+            "cachingOptions": {
+              "enableCache": true
+            },
             "componentRef": {
               "name": "comp-automltabulartrainingjob-run"
             },
@@ -196,6 +212,9 @@
             }
           },
           "model-deploy": {
+            "cachingOptions": {
+              "enableCache": true
+            },
             "componentRef": {
               "name": "comp-model-deploy"
             },
@@ -212,6 +231,20 @@
                 }
               },
               "parameters": {
+                "location": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "us-central1"
+                    }
+                  }
+                },
+                "machine_type": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "n1-standard-8"
+                    }
+                  }
+                },
                 "project": {
                   "componentInputParameter": "project_id"
                 }
@@ -222,6 +255,9 @@
             }
           },
           "tabulardataset-create": {
+            "cachingOptions": {
+              "enableCache": true
+            },
             "componentRef": {
               "name": "comp-tabulardataset-create"
             },
@@ -247,7 +283,7 @@
       }
     },
     "schemaVersion": "2.0.0",
-    "sdkVersion": "kfp-1.6.2"
+    "sdkVersion": "kfp-1.8.1"
   },
   "runtimeConfig": {
     "gcsOutputDirectory": "gs://feature-store-mars21/pl-root/telco-churn-auto"
