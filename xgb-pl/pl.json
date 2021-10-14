@@ -1,0 +1,503 @@
+{
+  "pipelineSpec": {
+    "components": {
+      "comp-model-deploy": {
+        "executorLabel": "exec-model-deploy",
+        "inputDefinitions": {
+          "artifacts": {
+            "model": {
+              "artifactType": {
+                "schemaTitle": "system.Model",
+                "schemaVersion": "0.0.1"
+              }
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "STRING"
+            },
+            "machine_type": {
+              "type": "STRING"
+            },
+            "project": {
+              "type": "STRING"
+            }
+          }
+        },
+        "outputDefinitions": {
+          "artifacts": {
+            "endpoint": {
+              "artifactType": {
+                "schemaTitle": "system.Artifact",
+                "schemaVersion": "0.0.1"
+              }
+            }
+          }
+        }
+      },
+      "comp-model-upload": {
+        "executorLabel": "exec-model-upload",
+        "inputDefinitions": {
+          "parameters": {
+            "artifact_uri": {
+              "type": "STRING"
+            },
+            "display_name": {
+              "type": "STRING"
+            },
+            "location": {
+              "type": "STRING"
+            },
+            "project": {
+              "type": "STRING"
+            },
+            "serving_container_image_uri": {
+              "type": "STRING"
+            }
+          }
+        },
+        "outputDefinitions": {
+          "artifacts": {
+            "model": {
+              "artifactType": {
+                "schemaTitle": "system.Model",
+                "schemaVersion": "0.0.1"
+              }
+            }
+          }
+        }
+      },
+      "comp-prepro": {
+        "executorLabel": "exec-prepro",
+        "inputDefinitions": {
+          "parameters": {
+            "data_path": {
+              "type": "STRING"
+            }
+          }
+        },
+        "outputDefinitions": {
+          "artifacts": {
+            "dta_out_x_test": {
+              "artifactType": {
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
+              }
+            },
+            "dta_out_x_train": {
+              "artifactType": {
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
+              }
+            },
+            "dta_out_y_test": {
+              "artifactType": {
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
+              }
+            },
+            "dta_out_y_train": {
+              "artifactType": {
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
+              }
+            }
+          }
+        }
+      },
+      "comp-train": {
+        "executorLabel": "exec-train",
+        "inputDefinitions": {
+          "artifacts": {
+            "dta_in_x_test": {
+              "artifactType": {
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
+              }
+            },
+            "dta_in_x_train": {
+              "artifactType": {
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
+              }
+            },
+            "dta_in_y_test": {
+              "artifactType": {
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
+              }
+            },
+            "dta_in_y_train": {
+              "artifactType": {
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
+              }
+            }
+          }
+        },
+        "outputDefinitions": {
+          "artifacts": {
+            "metrics_conf": {
+              "artifactType": {
+                "schemaTitle": "system.ClassificationMetrics",
+                "schemaVersion": "0.0.1"
+              }
+            },
+            "metrics_para": {
+              "artifactType": {
+                "schemaTitle": "system.Metrics",
+                "schemaVersion": "0.0.1"
+              }
+            },
+            "model": {
+              "artifactType": {
+                "schemaTitle": "system.Model",
+                "schemaVersion": "0.0.1"
+              }
+            }
+          },
+          "parameters": {
+            "path": {
+              "type": "STRING"
+            }
+          }
+        }
+      }
+    },
+    "deploymentSpec": {
+      "executors": {
+        "exec-model-deploy": {
+          "container": {
+            "args": [
+              "--init.project",
+              "{{$.inputs.parameters['project']}}",
+              "--init.location",
+              "{{$.inputs.parameters['location']}}",
+              "--init.model_name",
+              "{{$.inputs.artifacts['model'].uri}}",
+              "--method.machine_type",
+              "{{$.inputs.parameters['machine_type']}}",
+              "--executor_input",
+              "{{$}}",
+              "--resource_name_output_artifact_uri",
+              "{{$.outputs.artifacts['endpoint'].uri}}"
+            ],
+            "command": [
+              "python3",
+              "-m",
+              "google_cloud_pipeline_components.remote.aiplatform.remote_runner",
+              "--cls_name",
+              "Model",
+              "--method_name",
+              "deploy"
+            ],
+            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:latest"
+          }
+        },
+        "exec-model-upload": {
+          "container": {
+            "args": [
+              "--method.project",
+              "{{$.inputs.parameters['project']}}",
+              "--method.location",
+              "{{$.inputs.parameters['location']}}",
+              "--method.display_name",
+              "{{$.inputs.parameters['display_name']}}",
+              "--method.serving_container_image_uri",
+              "{{$.inputs.parameters['serving_container_image_uri']}}",
+              "--method.artifact_uri",
+              "{{$.inputs.parameters['artifact_uri']}}",
+              "--executor_input",
+              "{{$}}",
+              "--resource_name_output_artifact_uri",
+              "{{$.outputs.artifacts['model'].uri}}"
+            ],
+            "command": [
+              "python3",
+              "-m",
+              "google_cloud_pipeline_components.remote.aiplatform.remote_runner",
+              "--cls_name",
+              "Model",
+              "--method_name",
+              "upload"
+            ],
+            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:latest"
+          }
+        },
+        "exec-prepro": {
+          "container": {
+            "args": [
+              "--executor_input",
+              "{{$}}",
+              "--function_to_execute",
+              "prepro"
+            ],
+            "command": [
+              "sh",
+              "-c",
+              "(python3 -m ensurepip || python3 -m ensurepip --user) && (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet                 --no-warn-script-location 'argparse' 'pandas' 'xgboost' 'numpy' 'sklearn' 'fsspec' 'gcsfs' 'kfp==1.8.1' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet                 --no-warn-script-location 'argparse' 'pandas' 'xgboost' 'numpy' 'sklearn' 'fsspec' 'gcsfs' 'kfp==1.8.1' --user) && \"$0\" \"$@\"",
+              "sh",
+              "-ec",
+              "program_path=$(mktemp -d)\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+              "\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef prepro(\n    data_path: str,\n    dta_out_x_train: Output[Dataset],\n    dta_out_y_train: Output[Dataset],\n    dta_out_x_test: Output[Dataset],\n    dta_out_y_test: Output[Dataset]\n):\n\n    import pandas as pd\n    import xgboost as xgb\n    import numpy as np\n    import collections\n    import sklearn\n    from google.cloud import storage # test\n    from sklearn.model_selection import train_test_split\n    from sklearn.utils import shuffle\n\n    ### Import data ###\n    COLUMN_NAMES = collections.OrderedDict({\n        'as_of_year': np.int16,\n        'agency_code': 'category',\n        'loan_type': 'category',\n        'property_type': 'category',\n        'loan_purpose': 'category',\n        'occupancy': np.int8,\n        'loan_amt_thousands': np.float64,\n        'preapproval': 'category',\n        'county_code': np.float64,\n        'applicant_income_thousands': np.float64,\n        'purchaser_type': 'category',\n        'hoepa_status': 'category',\n        'lien_status': 'category',\n        'population': np.float64,\n        'ffiec_median_fam_income': np.float64,\n        'tract_to_msa_income_pct': np.float64,\n        'num_owner_occupied_units': np.float64,\n        'num_1_to_4_family_units': np.float64,\n        'approved': np.int8\n    })\n\n    data = pd.read_csv(data_path, index_col=False, dtype=COLUMN_NAMES)\n\n    ### Feature engineering ###\n    data = data.dropna()\n    data = data[0:100]\n    data = shuffle(data, random_state=2)\n\n    labels = data['approved'].values\n    data = data.drop(columns=['approved'])\n\n    dummy_columns = list(data.dtypes[data.dtypes == 'category'].index)\n    data = pd.get_dummies(data, columns=dummy_columns)\n\n    x,y = data.values,labels\n    x_train,x_test,y_train,y_test = train_test_split(x,y)\n\n    ### Export data as artifact ###\n    pd.DataFrame(x_train).to_csv(dta_out_x_train.path, index=False, header=False)  \n    pd.DataFrame(y_train).to_csv(dta_out_y_train.path, index=False, header=False)  \n    pd.DataFrame(x_test).to_csv(dta_out_x_test.path, index=False, header=False)  \n    pd.DataFrame(y_test).to_csv(dta_out_y_test.path, index=False, header=False)\n\n"
+            ],
+            "image": "python:3.7"
+          }
+        },
+        "exec-train": {
+          "container": {
+            "args": [
+              "--executor_input",
+              "{{$}}",
+              "--function_to_execute",
+              "train"
+            ],
+            "command": [
+              "sh",
+              "-c",
+              "(python3 -m ensurepip || python3 -m ensurepip --user) && (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet                 --no-warn-script-location 'argparse' 'pandas' 'xgboost' 'numpy' 'sklearn' 'fsspec' 'gcsfs' 'kfp==1.8.1' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet                 --no-warn-script-location 'argparse' 'pandas' 'xgboost' 'numpy' 'sklearn' 'fsspec' 'gcsfs' 'kfp==1.8.1' --user) && \"$0\" \"$@\"",
+              "sh",
+              "-ec",
+              "program_path=$(mktemp -d)\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+              "\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef train( \n    dta_in_x_train: Input[Dataset], \n    dta_in_y_train: Input[Dataset],\n    dta_in_x_test: Input[Dataset],\n    dta_in_y_test: Input[Dataset],\n    model: Output[Model],\n    metrics_conf: Output[ClassificationMetrics],\n    metrics_para: Output[Metrics]\n)  -> NamedTuple(\n    'ModelPathOut',\n    [\n      ('path', str)\n    ]):\n\n    import pandas as pd\n    import xgboost as xgb\n    import numpy as np\n    from google.cloud import storage\n    from sklearn.metrics import confusion_matrix\n    from sklearn.metrics import roc_curve\n    import os\n\n    from collections import namedtuple\n\n    ### Load data ###\n    x_train = pd.read_csv(dta_in_x_train.path, header=None)\n    y_train = pd.read_csv(dta_in_y_train.path, header=None)\n    x_test = pd.read_csv(dta_in_x_test.path, header=None)\n    y_test = pd.read_csv(dta_in_y_test.path, header=None)\n\n    ### Build model ###\n    eval_set = [(x_train, y_train.values.ravel()), (x_test, y_test.values.ravel())]\n    eval_metric = [\"auc\"]\n    bst = xgb.XGBClassifier(objective='reg:logistic')\n    bst.fit(x_train, y_train.values.ravel(), eval_set=eval_set, eval_metric=eval_metric)\n\n    ### Create evaluation metrics ###\n        # Confusion matrix\n    pred = bst.predict(x_train)\n    metrics_conf.log_confusion_matrix([\"0\", \"1\"], confusion_matrix(y_train.values.ravel(), pred).tolist())\n\n        # Additional metrics\n    results = bst.evals_result()\n    auc = results['validation_0']['auc'][0]\n    metrics_para.log_metric(\"auc\", (auc))\n\n    ### Export model ###\n    os.makedirs(model.path, exist_ok=True)\n    bst.save_model(model.path+\"/model.bst\")\n\n    output = namedtuple('ModelPathOut',\n        ['path'])\n    return output(model.path.replace('/gcs/', 'gs://'))\n\n"
+            ],
+            "image": "python:3.7",
+            "resources": {
+              "accelerator": {
+                "count": "1",
+                "type": "NVIDIA_TESLA_K80"
+              },
+              "cpuLimit": 4.0,
+              "memoryLimit": 15.032385536
+            }
+          }
+        }
+      }
+    },
+    "pipelineInfo": {
+      "name": "xgb-complex-v1"
+    },
+    "root": {
+      "dag": {
+        "outputs": {
+          "artifacts": {
+            "train-metrics_conf": {
+              "artifactSelectors": [
+                {
+                  "outputArtifactKey": "metrics_conf",
+                  "producerSubtask": "train"
+                }
+              ]
+            },
+            "train-metrics_para": {
+              "artifactSelectors": [
+                {
+                  "outputArtifactKey": "metrics_para",
+                  "producerSubtask": "train"
+                }
+              ]
+            }
+          }
+        },
+        "tasks": {
+          "model-deploy": {
+            "cachingOptions": {
+              "enableCache": true
+            },
+            "componentRef": {
+              "name": "comp-model-deploy"
+            },
+            "dependentTasks": [
+              "model-upload"
+            ],
+            "inputs": {
+              "artifacts": {
+                "model": {
+                  "taskOutputArtifact": {
+                    "outputArtifactKey": "model",
+                    "producerTask": "model-upload"
+                  }
+                }
+              },
+              "parameters": {
+                "location": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "us-central1"
+                    }
+                  }
+                },
+                "machine_type": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "n1-standard-4"
+                    }
+                  }
+                },
+                "project": {
+                  "componentInputParameter": "project_id"
+                }
+              }
+            },
+            "taskInfo": {
+              "name": "model-deploy"
+            }
+          },
+          "model-upload": {
+            "cachingOptions": {
+              "enableCache": true
+            },
+            "componentRef": {
+              "name": "comp-model-upload"
+            },
+            "dependentTasks": [
+              "train"
+            ],
+            "inputs": {
+              "parameters": {
+                "artifact_uri": {
+                  "taskOutputParameter": {
+                    "outputParameterKey": "path",
+                    "producerTask": "train"
+                  }
+                },
+                "display_name": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "modelxgb"
+                    }
+                  }
+                },
+                "location": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "us-central1"
+                    }
+                  }
+                },
+                "project": {
+                  "componentInputParameter": "project_id"
+                },
+                "serving_container_image_uri": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "us-docker.pkg.dev/vertex-ai/prediction/xgboost-cpu.1-4:latest"
+                    }
+                  }
+                }
+              }
+            },
+            "taskInfo": {
+              "name": "model-upload"
+            }
+          },
+          "prepro": {
+            "cachingOptions": {
+              "enableCache": true
+            },
+            "componentRef": {
+              "name": "comp-prepro"
+            },
+            "inputs": {
+              "parameters": {
+                "data_path": {
+                  "componentInputParameter": "data_path"
+                }
+              }
+            },
+            "taskInfo": {
+              "name": "prepro"
+            }
+          },
+          "train": {
+            "cachingOptions": {
+              "enableCache": true
+            },
+            "componentRef": {
+              "name": "comp-train"
+            },
+            "dependentTasks": [
+              "prepro"
+            ],
+            "inputs": {
+              "artifacts": {
+                "dta_in_x_test": {
+                  "taskOutputArtifact": {
+                    "outputArtifactKey": "dta_out_x_test",
+                    "producerTask": "prepro"
+                  }
+                },
+                "dta_in_x_train": {
+                  "taskOutputArtifact": {
+                    "outputArtifactKey": "dta_out_x_train",
+                    "producerTask": "prepro"
+                  }
+                },
+                "dta_in_y_test": {
+                  "taskOutputArtifact": {
+                    "outputArtifactKey": "dta_out_y_test",
+                    "producerTask": "prepro"
+                  }
+                },
+                "dta_in_y_train": {
+                  "taskOutputArtifact": {
+                    "outputArtifactKey": "dta_out_y_train",
+                    "producerTask": "prepro"
+                  }
+                }
+              }
+            },
+            "taskInfo": {
+              "name": "train"
+            }
+          }
+        }
+      },
+      "inputDefinitions": {
+        "parameters": {
+          "bucket_name": {
+            "type": "STRING"
+          },
+          "data_path": {
+            "type": "STRING"
+          },
+          "endpoint_name": {
+            "type": "STRING"
+          },
+          "project_id": {
+            "type": "STRING"
+          }
+        }
+      },
+      "outputDefinitions": {
+        "artifacts": {
+          "train-metrics_conf": {
+            "artifactType": {
+              "schemaTitle": "system.ClassificationMetrics",
+              "schemaVersion": "0.0.1"
+            }
+          },
+          "train-metrics_para": {
+            "artifactType": {
+              "schemaTitle": "system.Metrics",
+              "schemaVersion": "0.0.1"
+            }
+          }
+        }
+      }
+    },
+    "schemaVersion": "2.0.0",
+    "sdkVersion": "kfp-1.8.1"
+  },
+  "runtimeConfig": {
+    "gcsOutputDirectory": "gs://feature-store-mars21/xgb-pl",
+    "parameters": {
+      "bucket_name": {
+        "stringValue": "gs://feature-store-mars21/xgb-pl"
+      },
+      "endpoint_name": {
+        "stringValue": "xgb pipeline endpoint complex"
+      }
+    }
+  }
+}
