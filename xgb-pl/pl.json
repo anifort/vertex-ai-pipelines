@@ -1,22 +1,35 @@
 {
   "pipelineSpec": {
     "components": {
-      "comp-model-deploy": {
-        "executorLabel": "exec-model-deploy",
+      "comp-email-results": {
+        "executorLabel": "exec-email-results",
         "inputDefinitions": {
           "artifacts": {
-            "model": {
+            "metrics_para": {
               "artifactType": {
-                "schemaTitle": "system.Model",
+                "schemaTitle": "system.Metrics",
                 "schemaVersion": "0.0.1"
               }
             }
           },
           "parameters": {
-            "location": {
+            "project": {
+              "type": "STRING"
+            }
+          }
+        }
+      },
+      "comp-endpoint-create": {
+        "executorLabel": "exec-endpoint-create",
+        "inputDefinitions": {
+          "parameters": {
+            "display_name": {
               "type": "STRING"
             },
-            "machine_type": {
+            "labels": {
+              "type": "STRING"
+            },
+            "location": {
               "type": "STRING"
             },
             "project": {
@@ -28,9 +41,89 @@
           "artifacts": {
             "endpoint": {
               "artifactType": {
-                "schemaTitle": "system.Artifact",
+                "schemaTitle": "google.VertexEndpoint",
                 "schemaVersion": "0.0.1"
               }
+            }
+          },
+          "parameters": {
+            "gcp_resources": {
+              "type": "STRING"
+            }
+          }
+        }
+      },
+      "comp-gen-stats": {
+        "executorLabel": "exec-gen-stats",
+        "inputDefinitions": {
+          "parameters": {
+            "data_path": {
+              "type": "STRING"
+            }
+          }
+        },
+        "outputDefinitions": {
+          "artifacts": {
+            "html_artifact": {
+              "artifactType": {
+                "schemaTitle": "system.HTML",
+                "schemaVersion": "0.0.1"
+              }
+            }
+          }
+        }
+      },
+      "comp-model-deploy": {
+        "executorLabel": "exec-model-deploy",
+        "inputDefinitions": {
+          "artifacts": {
+            "endpoint": {
+              "artifactType": {
+                "schemaTitle": "google.VertexEndpoint",
+                "schemaVersion": "0.0.1"
+              }
+            },
+            "model": {
+              "artifactType": {
+                "schemaTitle": "google.VertexModel",
+                "schemaVersion": "0.0.1"
+              }
+            }
+          },
+          "parameters": {
+            "automatic_resources_max_replica_count": {
+              "type": "INT"
+            },
+            "automatic_resources_min_replica_count": {
+              "type": "INT"
+            },
+            "dedicated_resources_accelerator_count": {
+              "type": "INT"
+            },
+            "dedicated_resources_machine_type": {
+              "type": "STRING"
+            },
+            "dedicated_resources_max_replica_count": {
+              "type": "INT"
+            },
+            "dedicated_resources_min_replica_count": {
+              "type": "INT"
+            },
+            "explanation_metadata": {
+              "type": "STRING"
+            },
+            "explanation_parameters": {
+              "type": "STRING"
+            },
+            "traffic_split": {
+              "type": "STRING"
+            }
+          }
+        },
+        "outputDefinitions": {
+          "parameters": {
+            "gcp_resources": {
+              "type": "STRING"
             }
           }
         }
@@ -45,13 +138,34 @@
             "display_name": {
               "type": "STRING"
             },
+            "explanation_metadata": {
+              "type": "STRING"
+            },
+            "explanation_parameters": {
+              "type": "STRING"
+            },
+            "labels": {
+              "type": "STRING"
+            },
             "location": {
               "type": "STRING"
             },
             "project": {
               "type": "STRING"
             },
+            "serving_container_args": {
+              "type": "STRING"
+            },
+            "serving_container_command": {
+              "type": "STRING"
+            },
+            "serving_container_environment_variables": {
+              "type": "STRING"
+            },
             "serving_container_image_uri": {
+              "type": "STRING"
+            },
+            "serving_container_ports": {
               "type": "STRING"
             }
           }
@@ -60,9 +174,14 @@
           "artifacts": {
             "model": {
               "artifactType": {
-                "schemaTitle": "system.Model",
+                "schemaTitle": "google.VertexModel",
                 "schemaVersion": "0.0.1"
               }
+            }
+          },
+          "parameters": {
+            "gcp_resources": {
+              "type": "STRING"
             }
           }
         }
@@ -78,25 +197,25 @@
         },
         "outputDefinitions": {
           "artifacts": {
-            "dta_out_x_test": {
+            "data_out_x_test": {
               "artifactType": {
                 "schemaTitle": "system.Dataset",
                 "schemaVersion": "0.0.1"
               }
             },
-            "dta_out_x_train": {
+            "data_out_x_train": {
               "artifactType": {
                 "schemaTitle": "system.Dataset",
                 "schemaVersion": "0.0.1"
               }
             },
-            "dta_out_y_test": {
+            "data_out_y_test": {
               "artifactType": {
                 "schemaTitle": "system.Dataset",
                 "schemaVersion": "0.0.1"
               }
             },
-            "dta_out_y_train": {
+            "data_out_y_train": {
               "artifactType": {
                 "schemaTitle": "system.Dataset",
                 "schemaVersion": "0.0.1"
@@ -166,62 +285,117 @@
     },
     "deploymentSpec": {
       "executors": {
-        "exec-model-deploy": {
+        "exec-email-results": {
           "container": {
             "args": [
-              "--init.project",
-              "{{$.inputs.parameters['project']}}",
-              "--init.location",
-              "{{$.inputs.parameters['location']}}",
-              "--init.model_name",
-              "{{$.inputs.artifacts['model'].uri}}",
-              "--method.machine_type",
-              "{{$.inputs.parameters['machine_type']}}",
               "--executor_input",
               "{{$}}",
-              "--resource_name_output_artifact_uri",
-              "{{$.outputs.artifacts['endpoint'].uri}}"
+              "--function_to_execute",
+              "email_results"
+            ],
+            "command": [
+              "sh",
+              "-c",
+              "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'google-cloud-aiplatform==1.4.0' 'google-cloud-pubsub' 'kfp==1.8.9' && \"$0\" \"$@\"\n",
+              "sh",
+              "-ec",
+              "program_path=$(mktemp -d)\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+              "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef email_results(\n    metrics_para: Input[Metrics],\n    project: str\n) -> None:\n\n    import base64\n    import json\n    import os\n\n    from google.cloud import pubsub_v1\n\n\n    # Instantiates a Pub/Sub client\n    publisher = pubsub_v1.PublisherClient()\n\n\n    # Publishes a message to a Cloud Pub/Sub topic.\n\n    topic_name = \"emailer\"\n\n    print(f'Publishing message to topic {topic_name}')\n\n    # References an existing topic\n    topic_path = publisher.topic_path(project, topic_name)\n\n    message_json = json.dumps({\n        'data': {'auc': metrics_para.metadata['auc']},\n    })\n\n    message_bytes = message_json.encode('utf-8')\n\n    # Publishes a message\n\n    publish_future = publisher.publish(topic_path, data=message_bytes)\n    publish_future.result()  # Verify the publish succeeded\n    print('Message published.')\n\n"
+            ],
+            "image": "python:3.7"
+          }
+        },
+        "exec-endpoint-create": {
+          "container": {
+            "args": [
+              "--type",
+              "CreateEndpoint",
+              "--payload",
+              "{\"display_name\": \"{{$.inputs.parameters['display_name']}}\", \"description\": \"\", \"labels\": {{$.inputs.parameters['labels']}}, \"encryption_spec\": {\"kms_key_name\":\"\"}, \"network\": \"\"}",
+              "--project",
+              "{{$.inputs.parameters['project']}}",
+              "--location",
+              "{{$.inputs.parameters['location']}}",
+              "--gcp_resources",
+              "{{$.outputs.parameters['gcp_resources'].output_file}}",
+              "--executor_input",
+              "{{$}}"
             ],
             "command": [
               "python3",
+              "-u",
               "-m",
-              "google_cloud_pipeline_components.remote.aiplatform.remote_runner",
-              "--cls_name",
-              "Model",
-              "--method_name",
-              "deploy"
+              "google_cloud_pipeline_components.container.experimental.gcp_launcher.launcher"
             ],
-            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:latest"
+            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.2.0"
+          }
+        },
+        "exec-gen-stats": {
+          "container": {
+            "args": [
+              "--executor_input",
+              "{{$}}",
+              "--function_to_execute",
+              "gen_stats"
+            ],
+            "command": [
+              "sh",
+              "-c",
+              "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'tensorflow-data-validation==1.5.0' 'kfp==1.8.9' && \"$0\" \"$@\"\n",
+              "sh",
+              "-ec",
+              "program_path=$(mktemp -d)\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+              "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef gen_stats(\n    data_path: str,\n    html_artifact: Output[HTML]\n):\n\n    import tensorflow_data_validation as tfdv\n    train_stats = tfdv.generate_statistics_from_csv('gs://mortgage_dataset_files/mortgage-small.csv')\n    html_content = tfdv.utils.display_util.get_statistics_html(train_stats)\n    with open(html_artifact.path, 'w') as f:\n        f.write(html_content)\n\n"
+            ],
+            "image": "python:3.7"
+          }
+        },
+        "exec-model-deploy": {
+          "container": {
+            "args": [
+              "--type",
+              "DeployModel",
+              "--payload",
+              "{\"endpoint\": \"{{$.inputs.artifacts['endpoint'].metadata['resourceName']}}\", \"traffic_split\": {{$.inputs.parameters['traffic_split']}}, \"deployed_model\": {\"model\": \"{{$.inputs.artifacts['model'].metadata['resourceName']}}\", \"dedicated_resources\": {\"machine_spec\": {\"machine_type\": \"{{$.inputs.parameters['dedicated_resources_machine_type']}}\", \"accelerator_type\": \"\", \"accelerator_count\": {{$.inputs.parameters['dedicated_resources_accelerator_count']}}}, \"min_replica_count\": {{$.inputs.parameters['dedicated_resources_min_replica_count']}}, \"max_replica_count\": {{$.inputs.parameters['dedicated_resources_max_replica_count']}}}, \"automatic_resources\": {\"min_replica_count\": {{$.inputs.parameters['automatic_resources_min_replica_count']}}, \"max_replica_count\": {{$.inputs.parameters['automatic_resources_max_replica_count']}}}, \"service_account\": \"\", \"disable_container_logging\": \"\", \"enable_access_logging\": \"\", \"explanation_spec\": {\"parameters\": {{$.inputs.parameters['explanation_parameters']}}, \"metadata\": {{$.inputs.parameters['explanation_metadata']}}}}}",
+              "--project",
+              "",
+              "--location",
+              "",
+              "--gcp_resources",
+              "{{$.outputs.parameters['gcp_resources'].output_file}}"
+            ],
+            "command": [
+              "python3",
+              "-u",
+              "-m",
+              "google_cloud_pipeline_components.container.experimental.gcp_launcher.launcher"
+            ],
+            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.2.0"
           }
         },
         "exec-model-upload": {
           "container": {
             "args": [
-              "--method.project",
+              "--type",
+              "UploadModel",
+              "--payload",
+              "{\"display_name\": \"{{$.inputs.parameters['display_name']}}\", \"description\": \"\", \"predict_schemata\": {\"instance_schema_uri\": \"\", \"parameters_schema_uri\": \"\", \"prediction_schema_uri\": \"\"}, \"container_spec\": {\"image_uri\": \"{{$.inputs.parameters['serving_container_image_uri']}}\", \"command\": {{$.inputs.parameters['serving_container_command']}}, \"args\": {{$.inputs.parameters['serving_container_args']}}, \"env\": {{$.inputs.parameters['serving_container_environment_variables']}}, \"ports\": {{$.inputs.parameters['serving_container_ports']}}, \"predict_route\": \"\", \"health_route\": \"\"}, \"artifact_uri\": \"{{$.inputs.parameters['artifact_uri']}}\", \"explanation_spec\": {\"parameters\": {{$.inputs.parameters['explanation_parameters']}}, \"metadata\": {{$.inputs.parameters['explanation_metadata']}}}, \"encryption_spec\": {\"kms_key_name\":\"\"}, \"labels\": {{$.inputs.parameters['labels']}}}",
+              "--project",
               "{{$.inputs.parameters['project']}}",
-              "--method.location",
+              "--location",
               "{{$.inputs.parameters['location']}}",
-              "--method.display_name",
-              "{{$.inputs.parameters['display_name']}}",
-              "--method.serving_container_image_uri",
-              "{{$.inputs.parameters['serving_container_image_uri']}}",
-              "--method.artifact_uri",
-              "{{$.inputs.parameters['artifact_uri']}}",
+              "--gcp_resources",
+              "{{$.outputs.parameters['gcp_resources'].output_file}}",
               "--executor_input",
-              "{{$}}",
-              "--resource_name_output_artifact_uri",
-              "{{$.outputs.artifacts['model'].uri}}"
+              "{{$}}"
             ],
             "command": [
               "python3",
+              "-u",
               "-m",
-              "google_cloud_pipeline_components.remote.aiplatform.remote_runner",
-              "--cls_name",
-              "Model",
-              "--method_name",
-              "upload"
+              "google_cloud_pipeline_components.container.experimental.gcp_launcher.launcher"
             ],
-            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:latest"
+            "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:0.2.0"
           }
         },
         "exec-prepro": {
@@ -235,11 +409,11 @@
             "command": [
               "sh",
               "-c",
-              "(python3 -m ensurepip || python3 -m ensurepip --user) && (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet                 --no-warn-script-location 'argparse' 'pandas' 'xgboost' 'numpy' 'sklearn' 'fsspec' 'gcsfs' 'kfp==1.8.1' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet                 --no-warn-script-location 'argparse' 'pandas' 'xgboost' 'numpy' 'sklearn' 'fsspec' 'gcsfs' 'kfp==1.8.1' --user) && \"$0\" \"$@\"",
+              "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'argparse' 'pandas' 'xgboost' 'numpy' 'sklearn' 'fsspec' 'gcsfs' 'tensorflow_data_validation' 'kfp==1.8.9' && \"$0\" \"$@\"\n",
               "sh",
               "-ec",
               "program_path=$(mktemp -d)\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
-              "\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef prepro(\n    data_path: str,\n    dta_out_x_train: Output[Dataset],\n    dta_out_y_train: Output[Dataset],\n    dta_out_x_test: Output[Dataset],\n    dta_out_y_test: Output[Dataset]\n):\n\n    import pandas as pd\n    import xgboost as xgb\n    import numpy as np\n    import collections\n    import sklearn\n    from google.cloud import storage # test\n    from sklearn.model_selection import train_test_split\n    from sklearn.utils import shuffle\n\n    ### Import data ###\n    COLUMN_NAMES = collections.OrderedDict({\n        'as_of_year': np.int16,\n        'agency_code': 'category',\n        'loan_type': 'category',\n        'property_type': 'category',\n        'loan_purpose': 'category',\n        'occupancy': np.int8,\n        'loan_amt_thousands': np.float64,\n        'preapproval': 'category',\n        'county_code': np.float64,\n        'applicant_income_thousands': np.float64,\n        'purchaser_type': 'category',\n        'hoepa_status': 'category',\n        'lien_status': 'category',\n        'population': np.float64,\n        'ffiec_median_fam_income': np.float64,\n        'tract_to_msa_income_pct': np.float64,\n        'num_owner_occupied_units': np.float64,\n        'num_1_to_4_family_units': np.float64,\n        'approved': np.int8\n    })\n\n    data = pd.read_csv(data_path, index_col=False, dtype=COLUMN_NAMES)\n\n    ### Feature engineering ###\n    data = data.dropna()\n    data = data[0:100]\n    data = shuffle(data, random_state=2)\n\n    labels = data['approved'].values\n    data = data.drop(columns=['approved'])\n\n    dummy_columns = list(data.dtypes[data.dtypes == 'category'].index)\n    data = pd.get_dummies(data, columns=dummy_columns)\n\n    x,y = data.values,labels\n    x_train,x_test,y_train,y_test = train_test_split(x,y)\n\n    ### Export data as artifact ###\n    pd.DataFrame(x_train).to_csv(dta_out_x_train.path, index=False, header=False)  \n    pd.DataFrame(y_train).to_csv(dta_out_y_train.path, index=False, header=False)  \n    pd.DataFrame(x_test).to_csv(dta_out_x_test.path, index=False, header=False)  \n    pd.DataFrame(y_test).to_csv(dta_out_y_test.path, index=False, header=False)\n\n"
+              "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef prepro(\n    data_path: str,\n    data_out_x_train: Output[Dataset],\n    data_out_y_train: Output[Dataset],\n    data_out_x_test: Output[Dataset],\n    data_out_y_test: Output[Dataset]\n):\n\n    import pandas as pd\n    import xgboost as xgb\n    import numpy as np\n    import collections\n    import sklearn\n    from google.cloud import storage # test\n    from sklearn.model_selection import train_test_split\n    from sklearn.utils import shuffle\n\n\n    ### Import data ###\n    COLUMN_NAMES = collections.OrderedDict({\n        'as_of_year': np.int16,\n        'agency_code': 'category',\n        'loan_type': 'category',\n        'property_type': 'category',\n        'loan_purpose': 'category',\n        'occupancy': np.int8,\n        'loan_amt_thousands': np.float64,\n        'preapproval': 'category',\n        'county_code': np.float64,\n        'applicant_income_thousands': np.float64,\n        'purchaser_type': 'category',\n        'hoepa_status': 'category',\n        'lien_status': 'category',\n        'population': np.float64,\n        'ffiec_median_fam_income': np.float64,\n        'tract_to_msa_income_pct': np.float64,\n        'num_owner_occupied_units': np.float64,\n        'num_1_to_4_family_units': np.float64,\n        'approved': np.int8\n    })\n\n    data = pd.read_csv(data_path, index_col=False, dtype=COLUMN_NAMES)\n\n    ### Feature engineering ###\n    data = data.dropna()\n    data = data[0:100]\n    data = shuffle(data, random_state=2)\n\n    labels = data['approved'].values\n    data = data.drop(columns=['approved'])\n\n    dummy_columns = list(data.dtypes[data.dtypes == 'category'].index)\n    data = pd.get_dummies(data, columns=dummy_columns)\n\n    x,y = data.values,labels\n    x_train,x_test,y_train,y_test = train_test_split(x,y)\n\n    ### Export data as artifact ###\n    pd.DataFrame(x_train).to_csv(data_out_x_train.path, index=False, header=False)  \n    pd.DataFrame(y_train).to_csv(data_out_y_train.path, index=False, header=False)  \n    pd.DataFrame(x_test).to_csv(data_out_x_test.path, index=False, header=False)  \n    pd.DataFrame(y_test).to_csv(data_out_y_test.path, index=False, header=False)\n\n"
             ],
             "image": "python:3.7"
           }
@@ -255,18 +429,14 @@
             "command": [
               "sh",
               "-c",
-              "(python3 -m ensurepip || python3 -m ensurepip --user) && (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet                 --no-warn-script-location 'argparse' 'pandas' 'xgboost' 'numpy' 'sklearn' 'fsspec' 'gcsfs' 'kfp==1.8.1' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet                 --no-warn-script-location 'argparse' 'pandas' 'xgboost' 'numpy' 'sklearn' 'fsspec' 'gcsfs' 'kfp==1.8.1' --user) && \"$0\" \"$@\"",
+              "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'argparse' 'pandas' 'xgboost' 'numpy' 'sklearn' 'fsspec' 'gcsfs' 'kfp==1.8.9' && \"$0\" \"$@\"\n",
               "sh",
               "-ec",
               "program_path=$(mktemp -d)\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
-              "\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef train( \n    dta_in_x_train: Input[Dataset], \n    dta_in_y_train: Input[Dataset],\n    dta_in_x_test: Input[Dataset],\n    dta_in_y_test: Input[Dataset],\n    model: Output[Model],\n    metrics_conf: Output[ClassificationMetrics],\n    metrics_para: Output[Metrics]\n)  -> NamedTuple(\n    'ModelPathOut',\n    [\n      ('path', str)\n    ]):\n\n    import pandas as pd\n    import xgboost as xgb\n    import numpy as np\n    from google.cloud import storage\n    from sklearn.metrics import confusion_matrix\n    from sklearn.metrics import roc_curve\n    import os\n\n    from collections import namedtuple\n\n    ### Load data ###\n    x_train = pd.read_csv(dta_in_x_train.path, header=None)\n    y_train = pd.read_csv(dta_in_y_train.path, header=None)\n    x_test = pd.read_csv(dta_in_x_test.path, header=None)\n    y_test = pd.read_csv(dta_in_y_test.path, header=None)\n\n    ### Build model ###\n    eval_set = [(x_train, y_train.values.ravel()), (x_test, y_test.values.ravel())]\n    eval_metric = [\"auc\"]\n    bst = xgb.XGBClassifier(objective='reg:logistic')\n    bst.fit(x_train, y_train.values.ravel(), eval_set=eval_set, eval_metric=eval_metric)\n\n    ### Create evaluation metrics ###\n        # Confusion matrix\n    pred = bst.predict(x_train)\n    metrics_conf.log_confusion_matrix([\"0\", \"1\"], confusion_matrix(y_train.values.ravel(), pred).tolist())\n\n        # Additional metrics\n    results = bst.evals_result()\n    auc = results['validation_0']['auc'][0]\n    metrics_para.log_metric(\"auc\", (auc))\n\n    ### Export model ###\n    os.makedirs(model.path, exist_ok=True)\n    bst.save_model(model.path+\"/model.bst\")\n\n    output = namedtuple('ModelPathOut',\n        ['path'])\n    return output(model.path.replace('/gcs/', 'gs://'))\n\n"
+              "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef train( \n    dta_in_x_train: Input[Dataset], \n    dta_in_y_train: Input[Dataset],\n    dta_in_x_test: Input[Dataset],\n    dta_in_y_test: Input[Dataset],\n    model: Output[Model],\n    metrics_conf: Output[ClassificationMetrics],\n    metrics_para: Output[Metrics]\n)  -> NamedTuple(\n    'ModelPathOut',\n    [\n      ('path', str)\n    ]):\n\n    import pandas as pd\n    import xgboost as xgb\n    import numpy as np\n    from google.cloud import storage\n    from sklearn.metrics import confusion_matrix\n    from sklearn.metrics import roc_curve\n    import os\n\n    from collections import namedtuple\n\n    ### Load data ###\n    x_train = pd.read_csv(dta_in_x_train.path, header=None)\n    y_train = pd.read_csv(dta_in_y_train.path, header=None)\n    x_test = pd.read_csv(dta_in_x_test.path, header=None)\n    y_test = pd.read_csv(dta_in_y_test.path, header=None)\n\n    ### Build model ###\n    eval_set = [(x_train, y_train.values.ravel()), (x_test, y_test.values.ravel())]\n    eval_metric = [\"auc\"]\n    bst = xgb.XGBClassifier(objective='reg:logistic')\n    bst.fit(x_train, y_train.values.ravel(), eval_set=eval_set, eval_metric=eval_metric)\n\n    ### Create evaluation metrics ###\n        # Confusion matrix\n    pred = bst.predict(x_train)\n    metrics_conf.log_confusion_matrix([\"0\", \"1\"], confusion_matrix(y_train.values.ravel(), pred).tolist())\n\n        # Additional metrics\n    results = bst.evals_result()\n    auc = results['validation_0']['auc'][0]\n    metrics_para.log_metric(\"auc\", (auc))\n\n    ### Export model ###\n    os.makedirs(model.path, exist_ok=True)\n    bst.save_model(model.path+\"/model.bst\")\n\n    output = namedtuple('ModelPathOut',\n        ['path'])\n    return output(model.path.replace('/gcs/', 'gs://'))\n\n"
             ],
             "image": "python:3.7",
             "resources": {
-              "accelerator": {
-                "count": "1",
-                "type": "NVIDIA_TESLA_K80"
-              },
               "cpuLimit": 4.0,
               "memoryLimit": 15.032385536
             }
@@ -300,6 +470,91 @@
           }
         },
         "tasks": {
+          "email-results": {
+            "cachingOptions": {
+              "enableCache": true
+            },
+            "componentRef": {
+              "name": "comp-email-results"
+            },
+            "dependentTasks": [
+              "train"
+            ],
+            "inputs": {
+              "artifacts": {
+                "metrics_para": {
+                  "taskOutputArtifact": {
+                    "outputArtifactKey": "metrics_para",
+                    "producerTask": "train"
+                  }
+                }
+              },
+              "parameters": {
+                "project": {
+                  "componentInputParameter": "project_id"
+                }
+              }
+            },
+            "taskInfo": {
+              "name": "email-results"
+            }
+          },
+          "endpoint-create": {
+            "cachingOptions": {
+              "enableCache": true
+            },
+            "componentRef": {
+              "name": "comp-endpoint-create"
+            },
+            "dependentTasks": [
+              "train"
+            ],
+            "inputs": {
+              "parameters": {
+                "display_name": {
+                  "componentInputParameter": "endpoint_name"
+                },
+                "labels": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "{}"
+                    }
+                  }
+                },
+                "location": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "us-central1"
+                    }
+                  }
+                },
+                "project": {
+                  "componentInputParameter": "project_id"
+                }
+              }
+            },
+            "taskInfo": {
+              "name": "endpoint-create"
+            }
+          },
+          "gen-stats": {
+            "cachingOptions": {
+              "enableCache": true
+            },
+            "componentRef": {
+              "name": "comp-gen-stats"
+            },
+            "inputs": {
+              "parameters": {
+                "data_path": {
+                  "componentInputParameter": "data_path"
+                }
+              }
+            },
+            "taskInfo": {
+              "name": "gen-stats"
+            }
+          },
           "model-deploy": {
             "cachingOptions": {
               "enableCache": true
@@ -308,10 +563,17 @@
               "name": "comp-model-deploy"
             },
             "dependentTasks": [
+              "endpoint-create",
               "model-upload"
             ],
             "inputs": {
               "artifacts": {
+                "endpoint": {
+                  "taskOutputArtifact": {
+                    "outputArtifactKey": "endpoint",
+                    "producerTask": "endpoint-create"
+                  }
+                },
                 "model": {
                   "taskOutputArtifact": {
                     "outputArtifactKey": "model",
@@ -320,22 +582,68 @@
                 }
               },
               "parameters": {
-                "location": {
+                "automatic_resources_max_replica_count": {
                   "runtimeValue": {
                     "constantValue": {
-                      "stringValue": "us-central1"
+                      "intValue": "0"
                     }
                   }
                 },
-                "machine_type": {
+                "automatic_resources_min_replica_count": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "intValue": "0"
+                    }
+                  }
+                },
+                "dedicated_resources_accelerator_count": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "intValue": "0"
+                    }
+                  }
+                },
+                "dedicated_resources_machine_type": {
                   "runtimeValue": {
                     "constantValue": {
                       "stringValue": "n1-standard-4"
                     }
                   }
                 },
-                "project": {
-                  "componentInputParameter": "project_id"
+                "dedicated_resources_max_replica_count": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "intValue": "0"
+                    }
+                  }
+                },
+                "dedicated_resources_min_replica_count": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "intValue": "1"
+                    }
+                  }
+                },
+                "explanation_metadata": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "{}"
+                    }
+                  }
+                },
+                "explanation_parameters": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "{}"
+                    }
+                  }
+                },
+                "traffic_split": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "{}"
+                    }
+                  }
                 }
               }
             },
@@ -368,6 +676,27 @@
                     }
                   }
                 },
+                "explanation_metadata": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "{}"
+                    }
+                  }
+                },
+                "explanation_parameters": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "{}"
+                    }
+                  }
+                },
+                "labels": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "{}"
+                    }
+                  }
+                },
                 "location": {
                   "runtimeValue": {
                     "constantValue": {
@@ -378,10 +707,38 @@
                 "project": {
                   "componentInputParameter": "project_id"
                 },
+                "serving_container_args": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "{}"
+                    }
+                  }
+                },
+                "serving_container_command": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "{}"
+                    }
+                  }
+                },
+                "serving_container_environment_variables": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "{}"
+                    }
+                  }
+                },
                 "serving_container_image_uri": {
                   "runtimeValue": {
                     "constantValue": {
                       "stringValue": "us-docker.pkg.dev/vertex-ai/prediction/xgboost-cpu.1-4:latest"
+                    }
+                  }
+                },
+                "serving_container_ports": {
+                  "runtimeValue": {
+                    "constantValue": {
+                      "stringValue": "{}"
                     }
                   }
                 }
@@ -423,25 +780,25 @@
               "artifacts": {
                 "dta_in_x_test": {
                   "taskOutputArtifact": {
-                    "outputArtifactKey": "dta_out_x_test",
+                    "outputArtifactKey": "data_out_x_test",
                     "producerTask": "prepro"
                   }
                 },
                 "dta_in_x_train": {
                   "taskOutputArtifact": {
-                    "outputArtifactKey": "dta_out_x_train",
+                    "outputArtifactKey": "data_out_x_train",
                     "producerTask": "prepro"
                   }
                 },
                 "dta_in_y_test": {
                   "taskOutputArtifact": {
-                    "outputArtifactKey": "dta_out_y_test",
+                    "outputArtifactKey": "data_out_y_test",
                     "producerTask": "prepro"
                   }
                 },
                 "dta_in_y_train": {
                   "taskOutputArtifact": {
-                    "outputArtifactKey": "dta_out_y_train",
+                    "outputArtifactKey": "data_out_y_train",
                     "producerTask": "prepro"
                   }
                 }
@@ -487,7 +844,7 @@
       }
     },
     "schemaVersion": "2.0.0",
-    "sdkVersion": "kfp-1.8.1"
+    "sdkVersion": "kfp-1.8.9"
   },
   "runtimeConfig": {
     "gcsOutputDirectory": "gs://feature-store-mars21/xgb-pl",
