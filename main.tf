@@ -42,7 +42,8 @@ resource "google_project_iam_binding" "project" {
      "roles/bigquery.dataEditor",
      "roles/storage.objectViewer",
      "roles/storage.objectCreator",
-     "roles/aiplatform.user"
+     "roles/aiplatform.user",
+     #"roles/iam.serviceAccountUser"
    ])
    role   = each.key
    
